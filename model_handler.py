@@ -2,88 +2,88 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 class ModelHandler:
-	def __init__(self, args, train_loader, val_loader, generator, discriminator, mixer):
-		self.args = args
-		self.train_loader = train_loader
-		self.val_loader = val_loader
-		if args['cuda']:
-			self.device = torch.device('cuda')
-		else:
-			self.device = torch.device('cpu')
-		if args['dropout'] is not None:
-			self.dropout = nn.Dropout2d(args['dropout'])
-		self.generator = generator.to(self.device)
-		self.discriminator = discriminator.to(self.device)
+    def __init__(self, args, train_loader, val_loader, generator, discriminator, mixer):
+        self.args = args
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        if args['cuda']:
+            self.device = torch.device('cuda')
+        else:
+            self.device = torch.device('cpu')
+        if args['dropout'] is not None:
+            self.dropout = nn.Dropout2d(args['dropout'])
+        self.generator = generator.to(self.device)
+        self.discriminator = discriminator.to(self.device)
 
-		self.mixer = mixer
-		self.gen_opt = Adam(self.generator.parameters(), lr = args['lr'])
-		self.dis_opt = Adam(self.discriminator.parameters(), lr = args['lr'])
-		self.lamb = args['lamb']
-		self.beta = args['beta']
+        self.mixer = mixer
+        self.gen_opt = Adam(self.generator.parameters(), lr = args['lr'])
+        self.dis_opt = Adam(self.discriminator.parameters(), lr = args['lr'])
+        self.lamb = args['lamb']
+        self.beta = args['beta']
 
-	def train(self):
-		for i in range(self.args['epochs']):
-			_run_epoch(train_loader, train = True)
+    def train(self):
+        for i in range(self.args['epochs']):
+            _run_epoch(train_loader, train = True)
 
-			###
-			# Report Metric
-			####
+            ###
+            # Report Metric
+            ####
 
-			_run_epoch(val_loader, train = False)
+            _run_epoch(val_loader, train = False)
 
-	def _run_epoch(self, dataloader, train = True):
-		for i, d in enumerate(dataloader):
-			update_g = False
-			if i % self.args['update_g_freq']:
-				update_g = True
-			dec_mix, dec_loss, gen_loss = train_on_instance(d, train, update_g)
+    def _run_epoch(self, dataloader, train = True):
+        for i, d in enumerate(dataloader):
+            update_g = False
+            if i % self.args['update_g_freq']:
+                update_g = True
+            dec_mix, dec_loss, gen_loss = train_on_instance(d, train, update_g)
 
-			########
-			# Report Metric Here
-			########
-
-
-	def gan_loss(self, predictions, target):
-		target = torch.ones_like(predictions) * target
-		target = target.to(self.device)
-		loss = nn.BCELoss()
-		target = target.view(-1, 1)
-		return loss(predictions, target)
+            ########
+            # Report Metric Here
+            ########
 
 
-	def train_on_instance(self, x, train = True, update_g = False):
-		x_enc = self.generator.encode(x)
-		if args['dropout'] is not None:
-			x_enc = self.dropout(x_enc)
-		x_enc_dec = self.generator.decode(x_enc)
-		perm = torch.randperm(x.size(0))
-		recon_loss = torch.mean(torch.abs(x_enc_dec - x))
-		disc_loss_recon_g = self.gan_loss(self.discriminator(x_enc_dec), 1)
-		is_2d = True if len(x_enc.size()) == 2 else False
-		alpha = self.sampler(x.size(0), x_enc.size(1), is_2d)
-		mix = alpha * x_enc + (1 - alpha) * x_enc[perm]
-		dec_mix = self.generator.decode(mix)
-		disc_loss_mix_g = self.gan_loss(self.discriminator(dec_mix), 1)
-		gen_loss = self.recon_loss * self.lamb + disc_loss_recon_g + disc_loss_mix_g
-		if train:
-			if update_g:
-				self.generator.zero_grad()
-				gen_loss.backward()
-				self.gen_opt.step()
-		disc_loss_real = self.gan_loss(self.discriminator(x), 1)
-		disc_loss_fake_recon = self.gan_loss(self.discriminator(x_enc_dec.detach()), 0)
-		disc_loss_fake_mix = self.gan_loss(self.discriminator(dec_mix.detach()), 0)
-		disc_loss = disc_loss_real + disc_loss_fake_mix + disc_loss_fake_recon
-		if train:	
-			self.discriminator.zero_grad()
-			disc_loss.backward()
-			self.dis_opt.step()
-		return dec_mix, disc_loss, gen_loss
+    def gan_loss(self, predictions, target):
+        target = torch.ones_like(predictions) * target
+        target = target.to(self.device)
+        loss = nn.BCELoss()
+        target = target.view(-1, 1)
+        return loss(predictions, target)
+
+
+    def train_on_instance(self, x, train = True, update_g = False):
+        x_enc = self.generator.encode(x)
+        if args['dropout'] is not None:
+            x_enc = self.dropout(x_enc)
+        x_enc_dec = self.generator.decode(x_enc)
+        perm = torch.randperm(x.size(0))
+        recon_loss = torch.mean(torch.abs(x_enc_dec - x))
+        disc_loss_recon_g = self.gan_loss(self.discriminator(x_enc_dec), 1)
+        is_2d = True if len(x_enc.size()) == 2 else False
+        alpha = self.sampler(x.size(0), x_enc.size(1), is_2d)
+        mix = alpha * x_enc + (1 - alpha) * x_enc[perm]
+        dec_mix = self.generator.decode(mix)
+        disc_loss_mix_g = self.gan_loss(self.discriminator(dec_mix), 1)
+        gen_loss = self.recon_loss * self.lamb + disc_loss_recon_g + disc_loss_mix_g
+        if train:
+            if update_g:
+                self.generator.zero_grad()
+                gen_loss.backward()
+                self.gen_opt.step()
+        disc_loss_real = self.gan_loss(self.discriminator(x), 1)
+        disc_loss_fake_recon = self.gan_loss(self.discriminator(x_enc_dec.detach()), 0)
+        disc_loss_fake_mix = self.gan_loss(self.discriminator(dec_mix.detach()), 0)
+        disc_loss = disc_loss_real + disc_loss_fake_mix + disc_loss_fake_recon
+        if train:   
+            self.discriminator.zero_grad()
+            disc_loss.backward()
+            self.dis_opt.step()
+        return dec_mix, disc_loss, gen_loss
 
 
 
 
-	def sampler_mixup(self, bs, f, is_2d, p=None):
+    def sampler_mixup(self, bs, f, is_2d, p=None):
         """Mixup sampling function
         :param bs: batch size
         :param f: number of features / channels
