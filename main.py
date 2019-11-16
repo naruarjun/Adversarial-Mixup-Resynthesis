@@ -1,8 +1,9 @@
 import torch
 from torchvision import datasets, transforms
-
+from models import *
 import argparse
 from model_handler import ModelHandler
+import sys
 
 parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
 parser.add_argument('--batch-size', type=int, default=64, metavar='N',
@@ -36,15 +37,26 @@ train_loader = torch.utils.data.DataLoader(
                            transforms.ToTensor(),
                            transforms.Normalize((0.1307,), (0.3081,))
                        ])),
-        batch_size=args.batch_size, shuffle=True, **kwargs)
+        batch_size=args.batch_size, shuffle=True)
 test_loader = torch.utils.data.DataLoader(
         datasets.MNIST('data/', train=False, transform=transforms.Compose([
                            transforms.ToTensor(),
                            transforms.Normalize((0.1307,), (0.3081,))
-                       ])), batch_size=args.test_batch_size, shuffle=True, **kwargs)
+                       ])), batch_size=args.test_batch_size, shuffle=True)
 # TODO
-#generator = 
-#discriminator = 
-#mixer = 
+args1 = {
+        'width': 32,
+        'latent_width': 4,
+        'depth': 16, # nfg?
+        'advdepth': 16, #nfd?
+        'latent': 2, #4x4x2 = 32
+    }
+n_channels = 1
+args = vars(args)
+print(args)
+scales = int(round(math.log(args1['width'] // args1['latent_width'], 2)))
+generator = Autoencoder(scales,n_channels,args1['depth'],args1['latent'])
+discriminator = Discriminator(scales,args1['depth'],args1['latent'],n_channels)
+mixer = 'mixup' 
 handler = ModelHandler(args, train_loader, test_loader, generator, discriminator, mixer)
 handler.train()

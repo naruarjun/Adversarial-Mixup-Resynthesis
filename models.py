@@ -5,15 +5,15 @@ import math
 import torch.nn.functional as F
 
 
-def Initialize(self,init,layers,slope=0.2):
+def Initialize(init,layers,slope=0.2):
 	if(init=="xavier"):
 		for layer in layers:
 			if hasattr(layer, 'weight'):
 				w = layer.weight.data
 				nn.init.xavier_uniform_(w, gain=nn.init.calculate_gain('relu'))
-			if hasattr(layer, 'bias'):
-				b = layer.bias.data
-				nn.init.xavier_uniform_(b, gain=nn.init.calculate_gain('relu'))
+			# if hasattr(layer, 'bias'):
+			# 	b = layer.bias.data
+			# 	nn.init.xavier_uniform_(b, gain=nn.init.calculate_gain('relu'))
 	if(init=="dirac"):
 		for layer in layers:
 			if hasattr(layer, 'weight'):
@@ -54,10 +54,11 @@ def Initialize(self,init,layers,slope=0.2):
 				w.normal_(std=std)  
 			if hasattr(layer, 'bias'):
 				layer.bias.data.zero_()
+	layer.bias.data.zero_()
 
 
 
-class Encoder(nn.module):
+class Encoder(nn.Module):
 	def __init__(self,scales,initial_depth,final_depth,depth,kernel_size=3,padding=1,instance=False,spectral=False,dropout=None,init='xavier'):
 		super(Encoder,self).__init__()
 		
@@ -101,9 +102,9 @@ class Encoder(nn.module):
 
 
 
-class Decoder(nn.module):
+class Decoder(nn.Module):
 	def __init__(self,scales,initial_depth,final_depth,depth,kernel_size=3,padding=1,instance=False,spectral=False,dropout=None,init='xavier'):
-		uper(Encoder,self).__init__()
+		super(Decoder,self).__init__()
 
 		self.layers = []
 		
@@ -129,7 +130,7 @@ class Decoder(nn.module):
 
 			final_depth_temp = new_depth
 
-		if instance_norm:
+		if instance:
 			self.layers.append(nn.Conv2d(final_depth_temp,initial_depth,kernel_size,padding=padding))
 			self.layers.append(nn.InstanceNorm2d(initial_depth,affine=True))
 			self.layers.append(nn.LeakyReLU())
@@ -143,15 +144,15 @@ class Decoder(nn.module):
 
 		self.model = nn.Sequential(*(self.layers))
 
-    def forward(self,x):
+	def forward(self,x):
 		out = self.model(x);
 		return out
 
 
 
-class Autoencoder(nn.module):
+class Autoencoder(nn.Module):
 	def __init__(self,scales,n_channels,initial_depth,final_depth,kernel_size=3,padding=1,instance=False,spectral=False,dropout=None,init='xavier'):
-		super(Autoencoder,self).__init()
+		super(Autoencoder,self).__init__()
 
 		self.encoder = Encoder(scales,initial_depth,final_depth,n_channels,instance=instance)
 		self.decoder = Decoder(scales,initial_depth,final_depth,n_channels,instance=instance)
@@ -169,8 +170,8 @@ class Autoencoder(nn.module):
 
 
 
-class Discriminator(nn.module):
-	def __init__(self,scales,initial_depth,final_depth,depth,kernel_size=3,padding=1,instance=False,spectral=False,dropout=None,init='xavier')
+class Discriminator(nn.Module):
+	def __init__(self,scales,initial_depth,final_depth,depth,kernel_size=3,padding=1,instance=False,spectral=False,dropout=None,init='xavier'):
 		super(Discriminator,self).__init__()
 
 		self.encoder = Encoder(scales,initial_depth,final_depth,depth,spectral=spectral)

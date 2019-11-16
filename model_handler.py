@@ -6,10 +6,10 @@ class ModelHandler:
 		self.args = args
 		self.train_loader = train_loader
 		self.val_loader = val_loader
-		if args['cuda']:
-			self.device = torch.device('cuda')
-		else:
+		if args['no_cuda']:
 			self.device = torch.device('cpu')
+		else:
+			self.device = torch.device('cuda')
 		if args['dropout'] is not None:
 			self.dropout = nn.Dropout2d(args['dropout'])
 		self.generator = generator.to(self.device)
@@ -20,16 +20,6 @@ class ModelHandler:
 		self.dis_opt = Adam(self.discriminator.parameters(), lr = args['lr'])
 		self.lamb = args['lamb']
 		self.beta = args['beta']
-
-	def train(self):
-		for i in range(self.args['epochs']):
-			_run_epoch(train_loader, train = True)
-
-			###
-			# Report Metric
-			####
-
-			_run_epoch(val_loader, train = False)
 
 	def _run_epoch(self, dataloader, train = True):
 		for i, d in enumerate(dataloader):
@@ -42,6 +32,18 @@ class ModelHandler:
 			# Report Metric Here
 			########
 
+
+	def train(self):
+		for i in range(self.args['epochs']):
+			self._run_epoch(self.train_loader, train = True)
+
+			###
+			# Report Metric
+			####
+
+			self._run_epoch(self.val_loader, train = False)
+
+	
 
 	def gan_loss(self, predictions, target):
 		target = torch.ones_like(predictions) * target
@@ -84,126 +86,126 @@ class ModelHandler:
 
 
 	def sampler_mixup(self, bs, f, is_2d, p=None):
-        """Mixup sampling function
-        :param bs: batch size
-        :param f: number of features / channels
-        :param is_2d: should sampled alpha be 2D, instead of 4D?
-        :param p: Bernoulli parameter `p`. If this is None, then
-          we simply sample p ~ U(0,1).
-        :returns: an alpha of shape (bs, 1) if `is_2d`, otherwise
-          (bs, 1, 1, 1).
-        :rtype: 
-        """
-        shp = (bs, 1) if is_2d else (bs, 1, 1, 1)
-        if p is None:
-            alphas = []
-            for i in range(bs):
-                alpha = np.random.uniform(0, 1)
-                alphas.append(alpha)
-        else:
-            alphas = [p]*bs
-        alphas = np.asarray(alphas).reshape(shp)
-        alphas = torch.from_numpy(alphas).float()
-        if self.use_cuda:
-            alphas = alphas.cuda()
-        return alphas
+		"""Mixup sampling function
+		:param bs: batch size
+		:param f: number of features / channels
+		:param is_2d: should sampled alpha be 2D, instead of 4D?
+		:param p: Bernoulli parameter `p`. If this is None, then
+		  we simply sample p ~ U(0,1).
+		:returns: an alpha of shape (bs, 1) if `is_2d`, otherwise
+		  (bs, 1, 1, 1).
+		:rtype: 
+		"""
+		shp = (bs, 1) if is_2d else (bs, 1, 1, 1)
+		if p is None:
+			alphas = []
+			for i in range(bs):
+				alpha = np.random.uniform(0, 1)
+				alphas.append(alpha)
+		else:
+			alphas = [p]*bs
+		alphas = np.asarray(alphas).reshape(shp)
+		alphas = torch.from_numpy(alphas).float()
+		if self.use_cuda:
+			alphas = alphas.cuda()
+		return alphas
 
-    def sampler_mixup2(self, bs, f, is_2d, p=None):
-        """Mixup2 sampling function
-        :param bs: batch size
-        :param f: number of features / channels
-        :param is_2d: should sampled alpha be 2D, instead of 4D?
-        :param p: Bernoulli parameter `p`. If this is None, then
-          we simply sample p ~ U(0,1).
-        :returns: an alpha of shape (bs, f) if `is_2d`, otherwise
-          (bs, f, 1, 1).
-        :rtype: 
-        """
-        shp = (bs, f) if is_2d else (bs, f, 1, 1)
-        if p is None:
-            alphas = np.random.uniform(0, 1, size=shp)
-        else:
-            alphas = np.zeros(shp)+p
-        alphas = torch.from_numpy(alphas).float()
-        if self.use_cuda:
-            alphas = alphas.cuda()
-        return alphas
+	def sampler_mixup2(self, bs, f, is_2d, p=None):
+		"""Mixup2 sampling function
+		:param bs: batch size
+		:param f: number of features / channels
+		:param is_2d: should sampled alpha be 2D, instead of 4D?
+		:param p: Bernoulli parameter `p`. If this is None, then
+		  we simply sample p ~ U(0,1).
+		:returns: an alpha of shape (bs, f) if `is_2d`, otherwise
+		  (bs, f, 1, 1).
+		:rtype: 
+		"""
+		shp = (bs, f) if is_2d else (bs, f, 1, 1)
+		if p is None:
+			alphas = np.random.uniform(0, 1, size=shp)
+		else:
+			alphas = np.zeros(shp)+p
+		alphas = torch.from_numpy(alphas).float()
+		if self.use_cuda:
+			alphas = alphas.cuda()
+		return alphas
 
-    def sampler_fm(self, bs, f, is_2d, p=None):
-        """Bernoulli mixup sampling function
-        :param bs: batch size
-        :param f: number of features / channels
-        :param is_2d: should sampled alpha be 2D, instead of 4D?
-        :param p: Bernoulli parameter `p`. If this is `None`, then
-          we simply sample m ~ Bern(p), where p ~ U(0,1).
-        :returns: an alpha of shape (bs, f) if `is_2d`, otherwise
-          (bs, f, 1, 1).
-        :rtype: 
-        """
-        shp = (bs, f) if is_2d else (bs, f, 1, 1)
-        if p is None:
-            alphas = torch.bernoulli(torch.rand(shp)).float()
-        else:
-            rnd_state = np.random.RandomState(0)
-            rnd_idxs = np.arange(0, f)
-            rnd_state.shuffle(rnd_idxs)
-            rnd_idxs = torch.from_numpy(rnd_idxs)
-            how_many = int(p*f)
-            alphas = torch.zeros(shp).float()
-            if how_many > 0:
-                rnd_idxs = rnd_idxs[0:how_many]
-                alphas[:, rnd_idxs] += 1.
-        if self.use_cuda:
-            alphas = alphas.cuda()
-        return alphas
+	def sampler_fm(self, bs, f, is_2d, p=None):
+		"""Bernoulli mixup sampling function
+		:param bs: batch size
+		:param f: number of features / channels
+		:param is_2d: should sampled alpha be 2D, instead of 4D?
+		:param p: Bernoulli parameter `p`. If this is `None`, then
+		  we simply sample m ~ Bern(p), where p ~ U(0,1).
+		:returns: an alpha of shape (bs, f) if `is_2d`, otherwise
+		  (bs, f, 1, 1).
+		:rtype: 
+		"""
+		shp = (bs, f) if is_2d else (bs, f, 1, 1)
+		if p is None:
+			alphas = torch.bernoulli(torch.rand(shp)).float()
+		else:
+			rnd_state = np.random.RandomState(0)
+			rnd_idxs = np.arange(0, f)
+			rnd_state.shuffle(rnd_idxs)
+			rnd_idxs = torch.from_numpy(rnd_idxs)
+			how_many = int(p*f)
+			alphas = torch.zeros(shp).float()
+			if how_many > 0:
+				rnd_idxs = rnd_idxs[0:how_many]
+				alphas[:, rnd_idxs] += 1.
+		if self.use_cuda:
+			alphas = alphas.cuda()
+		return alphas
 
-    def sampler_fm2(self, bs, f, is_2d, p=None):
-        """Bernoulli mixup sampling function. Has
-          same expectation as fm but higher variance.
-        :param bs: batch size
-        :param f: number of features / channels
-        :param is_2d: should sampled alpha be 2D, instead of 4D?
-        :param p: Bernoulli parameter `p`. If this is `None`, then
-          we simply sample m ~ Bern(p), where p ~ U(0,1).
-        :returns: an alpha of shape (bs, f) if `is_2d`, otherwise
-          (bs, f, 1, 1).
-        :rtype: 
-        """
-        shp = (bs, f) if is_2d else (bs, f, 1, 1)
-        if p is None:
-            this_p = torch.rand(1).item()
-            alphas = torch.bernoulli(torch.zeros(shp)+this_p).float()
-        else:
-            rnd_state = np.random.RandomState(0)
-            rnd_idxs = np.arange(0, f)
-            rnd_state.shuffle(rnd_idxs)
-            rnd_idxs = torch.from_numpy(rnd_idxs)
-            how_many = int(p*f)
-            alphas = torch.zeros(shp).float()
-            if how_many > 0:
-                rnd_idxs = rnd_idxs[0:how_many]
-                alphas[:, rnd_idxs] += 1.
-        if self.use_cuda:
-            alphas = alphas.cuda()
-        return alphas
+	def sampler_fm2(self, bs, f, is_2d, p=None):
+		"""Bernoulli mixup sampling function. Has
+		  same expectation as fm but higher variance.
+		:param bs: batch size
+		:param f: number of features / channels
+		:param is_2d: should sampled alpha be 2D, instead of 4D?
+		:param p: Bernoulli parameter `p`. If this is `None`, then
+		  we simply sample m ~ Bern(p), where p ~ U(0,1).
+		:returns: an alpha of shape (bs, f) if `is_2d`, otherwise
+		  (bs, f, 1, 1).
+		:rtype: 
+		"""
+		shp = (bs, f) if is_2d else (bs, f, 1, 1)
+		if p is None:
+			this_p = torch.rand(1).item()
+			alphas = torch.bernoulli(torch.zeros(shp)+this_p).float()
+		else:
+			rnd_state = np.random.RandomState(0)
+			rnd_idxs = np.arange(0, f)
+			rnd_state.shuffle(rnd_idxs)
+			rnd_idxs = torch.from_numpy(rnd_idxs)
+			how_many = int(p*f)
+			alphas = torch.zeros(shp).float()
+			if how_many > 0:
+				rnd_idxs = rnd_idxs[0:how_many]
+				alphas[:, rnd_idxs] += 1.
+		if self.use_cuda:
+			alphas = alphas.cuda()
+		return alphas
 
 
-    def sampler(self, bs, f, is_2d, **kwargs):
-        """Sampler function, which outputs an alpha which
-        you can use to produce a convex combination between
-        two examples.
-        :param bs: batch size
-        :param f: number of units / feature maps at encoding
-        :param is_2d: is the bottleneck a 2d tensor?
-        :returns: an alpha of shape `(bs, f)` is `is_2d` is set,
-          otherwise `(bs, f, 1, 1)`.
-        :rtype: 
-        """
-        if self.mixer == 'mixup':
-            return self.sampler_mixup(bs, f, is_2d, **kwargs)
-        elif self.mixer == 'mixup2':
-            return self.sampler_mixup2(bs, f, is_2d, **kwargs)
-        elif self.mixer == 'fm':
-            return self.sampler_fm(bs, f, is_2d, **kwargs)
-        elif self.mixer == 'fm2':
-            return self.sampler_fm2(bs, f, is_2d, **kwargs)
+	def sampler(self, bs, f, is_2d, **kwargs):
+		"""Sampler function, which outputs an alpha which
+		you can use to produce a convex combination between
+		two examples.
+		:param bs: batch size
+		:param f: number of units / feature maps at encoding
+		:param is_2d: is the bottleneck a 2d tensor?
+		:returns: an alpha of shape `(bs, f)` is `is_2d` is set,
+		  otherwise `(bs, f, 1, 1)`.
+		:rtype: 
+		"""
+		if self.mixer == 'mixup':
+			return self.sampler_mixup(bs, f, is_2d, **kwargs)
+		elif self.mixer == 'mixup2':
+			return self.sampler_mixup2(bs, f, is_2d, **kwargs)
+		elif self.mixer == 'fm':
+			return self.sampler_fm(bs, f, is_2d, **kwargs)
+		elif self.mixer == 'fm2':
+			return self.sampler_fm2(bs, f, is_2d, **kwargs)
