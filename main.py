@@ -30,16 +30,18 @@ parser.add_argument('--update_g_freq', type=int, default=5)
 parser.add_argument('--save-model', action='store_true', default=False,
                     help='For Saving the current Model')
 args = parser.parse_args()
-
+img_sz = 32
 train_loader = torch.utils.data.DataLoader(
         datasets.MNIST('data/', train=True, download=True,
                        transform=transforms.Compose([
+                       	   transforms.Resize(img_sz),
                            transforms.ToTensor(),
                            transforms.Normalize((0.1307,), (0.3081,))
                        ])),
         batch_size=args.batch_size, shuffle=True)
 test_loader = torch.utils.data.DataLoader(
         datasets.MNIST('data/', train=False, transform=transforms.Compose([
+        				   transforms.Resize(img_sz),
                            transforms.ToTensor(),
                            transforms.Normalize((0.1307,), (0.3081,))
                        ])), batch_size=args.test_batch_size, shuffle=True)

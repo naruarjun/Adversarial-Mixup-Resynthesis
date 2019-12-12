@@ -69,22 +69,26 @@ class Encoder(nn.Module):
 		else:
 			sn = lambda x:x
 
-		self.layers.append(nn.Conv2d(depth,initial_depth,kernel_size,padding=padding))
+		self.layers.append(nn.Conv2d(depth,initial_depth,1,padding=padding))
 
 		initial_depth_temp = initial_depth
-		for scale in range(scales+1):
+		for scale in range(scales):
 			new_depth = initial_depth << scale
 
 			if instance:
 				self.layers.append(nn.Conv2d(initial_depth_temp,new_depth,kernel_size,padding=padding))
 				self.layers.append(nn.InstanceNorm2d(new_depth,affine=True))
 				self.layers.append(nn.LeakyReLU())
+				self.layers.append(nn.Conv2d(new_depth,new_depth,kernel_size,padding=padding))
+				self.layers.append(nn.InstanceNorm2d(new_depth,affine=True))
+				self.layers.append(nn.LeakyReLU())
 			else:
 				self.layers.append(nn.Conv2d(initial_depth_temp,new_depth,kernel_size,padding=padding))
 				self.layers.append(nn.LeakyReLU())
+				self.layers.append(nn.Conv2d(new_depth,new_depth,kernel_size,padding=padding))
+				self.layers.append(nn.LeakyReLU())
 			
 			self.layers.append(nn.AvgPool2d(2))
-			
 			initial_depth_temp = new_depth
 
 		self.layers.append(nn.Conv2d(initial_depth_temp,final_depth,kernel_size,padding=padding))
@@ -122,8 +126,13 @@ class Decoder(nn.Module):
 				self.layers.append(nn.Conv2d(final_depth_temp,new_depth,kernel_size,padding=padding))
 				self.layers.append(nn.InstanceNorm2d(new_depth,affine=True))
 				self.layers.append(nn.LeakyReLU())
+				self.layers.append(nn.Conv2d(new_depth,new_depth,kernel_size,padding=padding))
+				self.layers.append(nn.InstanceNorm2d(new_depth,affine=True))
+				self.layers.append(nn.LeakyReLU())
 			else:
 				self.layers.append(nn.Conv2d(final_depth_temp,new_depth,kernel_size,padding=padding))
+				self.layers.append(nn.LeakyReLU())
+				self.layers.append(nn.Conv2d(new_depth,new_depth,kernel_size,padding=padding))
 				self.layers.append(nn.LeakyReLU())
 
 			self.layers.append(nn.Upsample(scale_factor = 2))
@@ -175,25 +184,12 @@ class Discriminator(nn.Module):
 		super(Discriminator,self).__init__()
 
 		self.encoder = Encoder(scales,initial_depth,final_depth,depth,spectral=spectral)
-		self.fc = nn.Linear(final_depth*(final_depth**2),2)
 
 	def forward(self,x):
 		x = self.encoder(x)
 		x = x.reshape(x.shape[0],-1)
-		x = self.fc(x)
-		return F.log_softmax(x)
-
-
-
-
-
-
-	
-
-
-
-
-
-
-
-
+		#print(x.shape)
+		#x = self.fc(x)
+		torch.mean(x,-1)
+		#return F.log_softmax(x)
+		return torch.sigmoid(x)

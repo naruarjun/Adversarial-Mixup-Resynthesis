@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.optim import Adam
@@ -6,6 +7,7 @@ class ModelHandler:
         self.args = args
         self.train_loader = train_loader
         self.val_loader = val_loader
+        self.use_cuda = not args['no_cuda']
         if args['no_cuda']:
             self.device = torch.device('cpu')
         else:
@@ -28,6 +30,8 @@ class ModelHandler:
                 update_g = True
             dec_mix, dec_loss, gen_loss = self.train_on_instance(d, train, update_g)
 
+            print(gen_loss)
+            print(dec_loss)
             ########
             # Report Metric Here
             ########
@@ -54,8 +58,10 @@ class ModelHandler:
 
 
     def train_on_instance(self, x, train = True, update_g = False):
+        x = x[0]
+        x = x.cuda()
         x_enc = self.generator.encode(x)
-        if args['dropout'] is not None:
+        if self.args['dropout'] is not None:
             x_enc = self.dropout(x_enc)
         x_enc_dec = self.generator.decode(x_enc)
         perm = torch.randperm(x.size(0))
@@ -66,7 +72,7 @@ class ModelHandler:
         mix = alpha * x_enc + (1 - alpha) * x_enc[perm]
         dec_mix = self.generator.decode(mix)
         disc_loss_mix_g = self.gan_loss(self.discriminator(dec_mix), 1)
-        gen_loss = self.recon_loss * self.lamb + disc_loss_recon_g + disc_loss_mix_g
+        gen_loss = recon_loss * self.lamb + disc_loss_recon_g + disc_loss_mix_g
         if train:
             if update_g:
                 self.generator.zero_grad()
