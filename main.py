@@ -8,8 +8,8 @@ import sys
 parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
 parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 64)')
-parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
-                    help='input batch size for testing (default: 1000)')
+parser.add_argument('--test-batch-size', type=int, default=600, metavar='N',
+                    help='input batch size for testing (default: 600)')
 parser.add_argument('--epochs', type=int, default=10, metavar='N',
                     help='number of epochs to train (default: 10)')
 parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
@@ -31,6 +31,8 @@ parser.add_argument('--save-model', action='store_true', default=False,
                     help='For Saving the current Model')
 args = parser.parse_args()
 img_sz = 32
+
+#Make trainloader for each dataset
 train_loader = torch.utils.data.DataLoader(
         datasets.MNIST('data/', train=True, download=True,
                        transform=transforms.Compose([
@@ -53,12 +55,23 @@ args1 = {
         'advdepth': 16, #nfd?
         'latent': 2, #4x4x2 = 32
     }
+
+#Change with dataset
 n_channels = 1
 args = vars(args)
 print(args)
 scales = int(round(math.log(args1['width'] // args1['latent_width'], 2)))
 generator = Autoencoder(scales,n_channels,args1['depth'],args1['latent'])
 discriminator = Discriminator(scales,args1['depth'],args1['latent'],n_channels)
+
+#Change with dataset
+n_in = 32
+
+#Change with dataset
+n_out = 10
+
+
+classifier_1 = Classifier(n_in,n_out)
 mixer = 'mixup' 
-handler = ModelHandler(args, train_loader, test_loader, generator, discriminator, mixer)
+handler = ModelHandler(args, train_loader, test_loader, generator, discriminator, mixer, classifier_1)
 handler.train()

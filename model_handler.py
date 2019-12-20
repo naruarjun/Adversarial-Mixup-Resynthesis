@@ -2,8 +2,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.optim import Adam
+
+
+
 class ModelHandler:
-    def __init__(self, args, train_loader, val_loader, generator, discriminator, mixer):
+    def __init__(self, args, train_loader, val_loader, generator, discriminator, mixer, classifier):
         self.args = args
         self.train_loader = train_loader
         self.val_loader = val_loader
@@ -20,27 +23,52 @@ class ModelHandler:
         self.mixer = mixer
         self.gen_opt = Adam(self.generator.parameters(), lr = args['lr'])
         self.dis_opt = Adam(self.discriminator.parameters(), lr = args['lr'])
+
         self.lamb = args['lamb']
         self.beta = args['beta']
+        self.n_classes = 10
+        self.n_in = 32
+        # self.fn = nn.Sequential(
+        #     Flatten(),
+        #     nn.Linear(self.n_in, self.n_classes),
+        #     nn.LogSoftmax(dim=1)
+        # )
+        self.fn = classifier
+        self.fn.to(self.device)
+        self.fn_opt = Adam(self.fn.parameters(), lr = args['lr'])
 
     def _run_epoch(self, dataloader, train = True):
+        running_loss = 0
+        abc = 0
+        correct_all = 0
+        total = 0
         for i, d in enumerate(dataloader):
+            abc += 1
             update_g = False
             if i % self.args['update_g_freq']:
                 update_g = True
-            dec_mix, dec_loss, gen_loss = self.train_on_instance(d, train, update_g)
-
-            print(gen_loss)
-            print(dec_loss)
+            dec_mix, dec_loss, gen_loss, cls_loss, correct, no = self.train_on_instance(d, train, update_g)
+            running_loss += cls_loss
+            correct_all += correct
+            total += no
             ########
             # Report Metric Here
             ########
+        running_loss = running_loss/abc
+
+        accuracy = correct_all/(total)
+        if train:
+            print("LOSS TRAIN:", running_loss,"  ACCURACY:",accuracy)
+            
+        else:
+            print("LOSS VAL:", running_loss,"  ACCURACY:",accuracy)
+            print(" ")
+            
 
 
     def train(self):
         for i in range(self.args['epochs']):
             self._run_epoch(self.train_loader, train = True)
-
             ###
             # Report Metric
             ####
@@ -56,8 +84,15 @@ class ModelHandler:
         target = target.view(-1, 1)
         return loss(predictions, target)
 
+    def accuracy(self,outputs,labels):
+    	_, predicted = torch.max(outputs.data, 1)
+    	correct += (predicted == labels).sum().item()
+    	return correct
+
 
     def train_on_instance(self, x, train = True, update_g = False):
+        labels = x[1]
+        labels = labels.cuda()
         x = x[0]
         x = x.cuda()
         x_enc = self.generator.encode(x)
@@ -86,7 +121,18 @@ class ModelHandler:
             self.discriminator.zero_grad()
             disc_loss.backward()
             self.dis_opt.step()
-        return dec_mix, disc_loss, gen_loss
+        outputs_cls = self.fn(x_enc.detach())
+        criterion = nn.NLLLoss()
+        cls_loss = criterion(outputs_cls, labels)
+        _, predicted = torch.max(outputs_cls.data, 1)
+        
+        total = labels.size(0)
+        correct = (predicted == labels).sum().item()
+        if train:
+            self.fn.zero_grad()
+            cls_loss.backward()
+            self.fn_opt.step()
+        return dec_mix, disc_loss, gen_loss, cls_loss,correct,total
 
 
 

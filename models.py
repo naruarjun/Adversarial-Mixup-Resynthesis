@@ -193,3 +193,15 @@ class Discriminator(nn.Module):
 		torch.mean(x,-1)
 		#return F.log_softmax(x)
 		return torch.sigmoid(x)
+
+class Flatten(nn.Module):
+    def forward(self, input):
+        return input.view(input.size(0), -1)
+
+def Classifier(n_in,n_out):
+    fn = nn.Sequential(
+        Flatten(),
+        nn.Linear(n_in, n_out),
+        nn.LogSoftmax(dim=1)
+    )
+    return fn
