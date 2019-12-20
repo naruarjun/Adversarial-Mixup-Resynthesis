@@ -34,8 +34,11 @@ class ModelHandler:
         #     nn.LogSoftmax(dim=1)
         # )
         self.fn = classifier
+        self.epoch = 0
         self.fn.to(self.device)
         self.fn_opt = Adam(self.fn.parameters(), lr = args['lr'])
+        if self.args['restore_dir']:
+            self.restore()
 
     def _run_epoch(self, dataloader, train = True):
         running_loss = 0
@@ -67,13 +70,15 @@ class ModelHandler:
 
 
     def train(self):
-        for i in range(self.args['epochs']):
+        while self.epoch < self.args['epochs']:
             self._run_epoch(self.train_loader, train = True)
             ###
             # Report Metric
             ####
 
             self._run_epoch(self.val_loader, train = False)
+            self.save_state()
+            self.epoch += 1
 
     
 
@@ -134,8 +139,20 @@ class ModelHandler:
             self.fn_opt.step()
         return dec_mix, disc_loss, gen_loss, cls_loss,correct,total
 
-
-
+    def restore(self):
+        state = torch.load(self.args['restore_dir'])
+        self.epoch = state['epoch']
+        self.generator = state['generator']
+        self.discriminator = state['discriminator']
+        self.classifier = state['classifier']
+    def save_state(self):
+        if not os.path.exists(self.args['save_state_dir']):
+            os.mkdir(self.args['save_state_dir'])
+        save_dic = {'epoch':self.epoch,
+            'generator':self.generator.state_dict(),
+            'discriminator':self.discriminator.state_dict(),
+            'classifier':self.classifier.state_dict()}
+        torch.save(save_dic, self.args['save_state_dir']+'model.pth')
 
     def sampler_mixup(self, bs, f, is_2d, p=None):
         """Mixup sampling function

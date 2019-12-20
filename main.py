@@ -26,6 +26,8 @@ parser.add_argument('--dropout', type=float, default=0.01)
 parser.add_argument('--lamb', type=float, default=0.01)
 parser.add_argument('--beta', type=float, default=0.01)
 parser.add_argument('--update_g_freq', type=int, default=5)
+parser.add_argument('--save-state-dir', type = str, default = None)
+parser.add_argument('--restore-dir', type = str, default = None)
 
 parser.add_argument('--save-model', action='store_true', default=False,
                     help='For Saving the current Model')
