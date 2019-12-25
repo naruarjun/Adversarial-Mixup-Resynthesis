@@ -4,13 +4,14 @@ from models import *
 import argparse
 from model_handler import ModelHandler
 import sys
+import os
 
 parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
 parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 64)')
 parser.add_argument('--test-batch-size', type=int, default=600, metavar='N',
                     help='input batch size for testing (default: 600)')
-parser.add_argument('--epochs', type=int, default=10, metavar='N',
+parser.add_argument('--epochs', type=int, default=2000, metavar='N',
                     help='number of epochs to train (default: 10)')
 parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                     help='learning rate (default: 0.01)')
@@ -23,13 +24,13 @@ parser.add_argument('--seed', type=int, default=1, metavar='S',
 parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='how many batches to wait before logging training status')
 parser.add_argument('--dropout', type=float, default=0.01)
-parser.add_argument('--lamb', type=float, default=0.01)
-parser.add_argument('--beta', type=float, default=0.01)
+parser.add_argument('--lamb', type=float, default=10)
+parser.add_argument('--beta', type=float, default=0)
 parser.add_argument('--update_g_freq', type=int, default=5)
 parser.add_argument('--save-state-dir', type = str, default = None)
 parser.add_argument('--restore-dir', type = str, default = None)
 
-parser.add_argument('--save-model', action='store_true', default=False,
+parser.add_argument('--save-model', action='store_true', default=True,
                     help='For Saving the current Model')
 args = parser.parse_args()
 img_sz = 32
@@ -63,8 +64,8 @@ n_channels = 1
 args = vars(args)
 print(args)
 scales = int(round(math.log(args1['width'] // args1['latent_width'], 2)))
-generator = Autoencoder(scales,n_channels,args1['depth'],args1['latent'])
-discriminator = Discriminator(scales,args1['depth'],args1['latent'],n_channels)
+generator = Autoencoder(scales,n_channels,args1['depth'],args1['latent'],instance=True)
+discriminator = Discriminator(scales,args1['depth'],args1['latent'],n_channels,spectral=True)
 
 #Change with dataset
 n_in = 32

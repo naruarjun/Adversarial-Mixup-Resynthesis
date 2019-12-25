@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.optim import Adam
+import os
+import pickle
 
 
 
@@ -39,6 +41,9 @@ class ModelHandler:
         self.fn_opt = Adam(self.fn.parameters(), lr = args['lr'])
         if self.args['restore_dir']:
             self.restore()
+        self.loss_train = {}
+        self.loss_val = {}
+        self.accuracy = {}
 
     def _run_epoch(self, dataloader, train = True):
         running_loss = 0
@@ -61,16 +66,25 @@ class ModelHandler:
 
         accuracy = correct_all/(total)
         if train:
+            self.loss_train[self.epoch] = running_loss
             print("LOSS TRAIN:", running_loss,"  ACCURACY:",accuracy)
             
         else:
+            self.accuracy[self.epoch] = accuracy
+            self.loss_val[self.epoch] = running_loss
             print("LOSS VAL:", running_loss,"  ACCURACY:",accuracy)
             print(" ")
             
 
 
     def train(self):
+        f1=open('mnist_train_loss_mixup2.p', 'a+')
+        f2=open('mnist_val_loss_mixup2.p', 'a+')
+        f3=open('mnist_acc_mixup2.p', 'a+')
+        print(self.generator)
+        print(self.discriminator)
         while self.epoch < self.args['epochs']:
+            print("EPOCH: ",self.epoch)
             self._run_epoch(self.train_loader, train = True)
             ###
             # Report Metric
@@ -79,6 +93,13 @@ class ModelHandler:
             self._run_epoch(self.val_loader, train = False)
             self.save_state()
             self.epoch += 1
+
+            with open('pickle_data/mnist_train_loss_mixup2.p', 'wb') as handle:
+                pickle.dump(self.loss_train,handle)
+            with open('pickle_data/mnist_val_loss_mixup2.p', 'wb') as handle:
+                pickle.dump(self.loss_val,handle)
+            with open('pickle_data/mnist_acc_mixup2.p', 'wb') as handle:
+                pickle.dump(self.accuracy,handle)
 
     
 
@@ -142,17 +163,18 @@ class ModelHandler:
     def restore(self):
         state = torch.load(self.args['restore_dir'])
         self.epoch = state['epoch']
-        self.generator = state['generator']
-        self.discriminator = state['discriminator']
-        self.classifier = state['classifier']
+        self.generator.load_state_dict(state['generator'])
+        self.discriminator.load_state_dict(state['discriminator'])
+        self.fn.load_state_dict(state['classifier'])
+        print(self.generator)
     def save_state(self):
         if not os.path.exists(self.args['save_state_dir']):
             os.mkdir(self.args['save_state_dir'])
         save_dic = {'epoch':self.epoch,
             'generator':self.generator.state_dict(),
             'discriminator':self.discriminator.state_dict(),
-            'classifier':self.classifier.state_dict()}
-        torch.save(save_dic, self.args['save_state_dir']+'model.pth')
+            'classifier':self.fn.state_dict()}
+        torch.save(save_dic, self.args['save_state_dir']+'model_low_learning_rate.pth')
 
     def sampler_mixup(self, bs, f, is_2d, p=None):
         """Mixup sampling function
